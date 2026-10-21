@@ -1,0 +1,34 @@
+name: droidvm-images
+on:
+  workflow_dispatch:
+jobs:
+  images:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - name: Fetch OS and SystemOS from the IPSW
+        run: |
+          git clone --depth 1 --branch wip/droidvm https://github.com/Droid-VM/UniXNU.git
+          git clone --depth 1 --branch wip/hackintosh https://github.com/Droid-VM/UniXNU-droidvm.git
+          cd UniXNU
+          ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
+          ./unixnu ipsw fetch OS Cryptex1,SystemOS
+          ls -la out/ipsw/*/
+      - name: Expand to raw whole-disk images
+        run: |
+          mkdir out
+          D=$(ls -d UniXNU/out/ipsw/*/)
+          hdiutil convert "$D/044-76040-038.dmg" -format UDTO -o out/os
+          mv out/os.cdr out/os.img
+          cp "$D/044-76034-038.dmg" out/systemos.img
+          ls -la out
+          shasum -a 256 out/os.img out/systemos.img | tee out/SHA256SUMS
+      - name: Compress
+        run: |
+          brew install zstd
+          cd out && zstd -T0 -3 --rm os.img systemos.img && ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: droidvm-images
+          path: out
+          compression-level: 0
