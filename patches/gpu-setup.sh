@@ -6,9 +6,10 @@ set -euxo pipefail
 TREE=$(cd "$1" && pwd)
 cd "$TREE"
 mkdir -p .cache/mesa-tools/bin .cache/gpu-reference
-pin() { python3 -c "import json,sys;d=json.load(open('scripts/data/$1'));print(eval(sys.argv[1]))" "$2"; }
-MESA_COMMIT=$(pin adreno-compiler-inputs.json "d['mesa']['commit']")
-M2V_COMMIT=$(pin gpu-metal-vulkan-inputs.json "d['translator']['commit']")
+HERE=$(cd "$(dirname "$0")" && pwd)
+pins() { python3 "$HERE/gpu_pins.py" "$1" "$TREE"; }
+MESA_COMMIT=$(pins mesa-commit)
+M2V_COMMIT=$(pins m2v-commit)
 
 if [ ! -d .cache/mesa-work/.git ]; then
   git clone --filter=blob:none --no-checkout https://gitlab.freedesktop.org/mesa/mesa.git .cache/mesa-work \
@@ -16,9 +17,11 @@ if [ ! -d .cache/mesa-work/.git ]; then
   (
     cd .cache/mesa-work
     git sparse-checkout init --cone
-    git sparse-checkout set $(pin adreno-compiler-inputs.json "' '.join(d['mesa']['sparse_directories'])")
+    DIRS=$(pins mesa-dirs); [ -n "$DIRS" ]
+    git sparse-checkout set $DIRS
     git checkout --detach "$MESA_COMMIT"
-    for patch in $(pin adreno-compiler-inputs.json "' '.join(d['patches'])"); do git apply "$TREE/$patch"; done
+    PATCHES=$(pins mesa-patches); [ -n "$PATCHES" ]
+    for patch in $PATCHES; do git apply "$TREE/$patch"; done
     git rev-parse HEAD; git status --short | head -20
   )
 fi
