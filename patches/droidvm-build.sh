@@ -58,6 +58,27 @@ grep OWNER_DATA_VOLUME_UUID "$DEV/configs/droidvm_defconfig"
 IPSW_URL=$(python3 -c "import tomllib;print(tomllib.load(open('$DEV/board.toml','rb'))['ipsw']['url'])")
 mkdir -p "$TREE/refer"
 curl -fL --retry 5 -o "$TREE/refer/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw" "$IPSW_URL"
+python3 - "$TREE" <<'PY'
+import hashlib, plistlib, sys, zipfile
+from pathlib import Path
+tree = Path(sys.argv[1])
+with zipfile.ZipFile(tree / 'refer/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw') as z:
+    m = plistlib.loads(z.read('BuildManifest.plist'))
+    ident = [i for i in m['BuildIdentities'] if i['Info']['DeviceClass'] == 'j120ap'][0]
+    raw = z.read(ident['Manifest']['StaticTrustCache']['Info']['Path'])
+def der(d, at):
+    tag, size = d[at:at + 2]; at += 2
+    if size & 128:
+        n = size & 127; size = int.from_bytes(d[at:at + n], 'big'); at += n
+    return tag, d[at:at + size], at + size
+tag, seq, _ = der(raw, 0); fields, c = [], 0
+while c < len(seq):
+    k, v, c = der(seq, c); fields.append((k, v))
+assert fields[0][1] == b'IM4P', fields[0]
+out = tree / '.cache/firmware/target-volumes/static-trustcache.bin'
+out.write_bytes(fields[3][1])
+print('static trust cache', hashlib.sha256(fields[3][1]).hexdigest())
+PY
 python3 "$TREE/scripts/build-original-system-trust.py"
 
 # 7. package (UniXNU.efi), DarwinBoot.efi, payload, boot disk
