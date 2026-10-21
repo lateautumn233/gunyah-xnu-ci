@@ -39,43 +39,14 @@ jobs:
           ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
           ./unixnu fetch
           ./unixnu ipsw fetch
-      - name: Reference candidate (kernel without storage/display drivers)
-        working-directory: UniXNU
-        run: |
-          python3 "$GITHUB_WORKSPACE/patches/make-reference-device.py" ../UniXNU-droidvm ../UniXNU-droidvm-ref
-          ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm-ref --out "$PWD/out-ref"
-          ./unixnu fetch
-          ./unixnu tree --out "$PWD/out-ref"
-          bash "$GITHUB_WORKSPACE/patches/seed-github-cache.sh" out-ref/droidvm/tree
-          mkdir -p out-ref && ln -sfn "$PWD/out/ipsw" out-ref/ipsw
-          ./unixnu build kernel -j "$(sysctl -n hw.ncpu)" --out "$PWD/out-ref"
-          ls -la out-ref/droidvm/kernel
-      - name: Build
-        working-directory: UniXNU
-        run: |
-          ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
-          ./unixnu tree
-          bash "$GITHUB_WORKSPACE/patches/seed-github-cache.sh" out/droidvm/tree
-          # Owner root: signed policies of the original OS and SystemOS images (not automated by the public repos).
-          ./unixnu ipsw fetch OS Cryptex1,SystemOS
-          TV="$GITHUB_WORKSPACE/UniXNU-droidvm/.cache/firmware/target-volumes"
-          mkdir -p "$TV/os-mount"
-          for f in 044-76040-038.dmg 044-76034-038.dmg; do cp "$(ls out/ipsw/*/$f)" "$TV/$f"; done
-          df -h /
-          TREE="$PWD/out/droidvm/tree"
-          python3 "$TREE/kits/VerifiedRoot/tests/check.py" --output "$TREE/build/verified-root-host" --openssl-prefix "$(brew --prefix openssl@3)"
-          hdiutil attach -readonly -noverify -noautofsck -nobrowse -mountpoint "$TV/os-mount" "$TV/044-76040-038.dmg"
-          python3 "$TREE/scripts/build-owner-os-policy.py"
-          python3 "$TREE/scripts/build-owner-systemos-policy.py"
-          mkdir -p out/droidvm/tree/build/reference-candidate
-          cp out-ref/droidvm/kernel/kernel.macho out-ref/droidvm/kernel/kernel.json out/droidvm/tree/build/reference-candidate/
-          ./unixnu build ${{ inputs.step }} -j "$(sysctl -n hw.ncpu)"
+      - name: Build image
+        run: bash "$GITHUB_WORKSPACE/patches/droidvm-build.sh"
       - name: Collect
         if: always()
         run: |
           mkdir -p collect
           cp -R UniXNU/out/droidvm/logs collect/ 2>/dev/null || true
-          find UniXNU/out/droidvm -maxdepth 3 \( -name 'kernel.macho' -o -name '*.log' -o -name '*.json' \) -size -200M 2>/dev/null | head -200 | while read f; do mkdir -p "collect/$(dirname "$f")"; cp "$f" "collect/$f"; done
+          find UniXNU/out/droidvm -maxdepth 3 \( -name 'droidvm-disk.img' -o -name 'kernel.macho' -o -name '*.adt' -o -name '*.log' -o -name '*.json' \) -size -300M 2>/dev/null | head -200 | while read f; do mkdir -p "collect/$(dirname "$f")"; cp "$f" "collect/$f"; done
           gzip -r collect/UniXNU/out 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
