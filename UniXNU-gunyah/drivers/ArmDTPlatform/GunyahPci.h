@@ -2,6 +2,16 @@
 #pragma once
 #include <stdint.h>
 
+// Guest MMIO must be a single non-writeback load/store so the hypervisor can
+// emulate the fault (ISV=1). Newer compilers merge or post-index volatile
+// accesses, which Gunyah cannot decode, so these are explicit.
+static inline uint8_t gunyahMmioRead8(uintptr_t p) { uint32_t v; __asm__ volatile("ldrb %w0, [%1]" : "=r"(v) : "r"(p) : "memory"); return uint8_t(v); }
+static inline uint16_t gunyahMmioRead16(uintptr_t p) { uint32_t v; __asm__ volatile("ldrh %w0, [%1]" : "=r"(v) : "r"(p) : "memory"); return uint16_t(v); }
+static inline uint32_t gunyahMmioRead32(uintptr_t p) { uint32_t v; __asm__ volatile("ldr %w0, [%1]" : "=r"(v) : "r"(p) : "memory"); return v; }
+static inline void gunyahMmioWrite8(uintptr_t p, uint8_t v) { __asm__ volatile("strb %w0, [%1]" :: "r"(uint32_t(v)), "r"(p) : "memory"); }
+static inline void gunyahMmioWrite16(uintptr_t p, uint16_t v) { __asm__ volatile("strh %w0, [%1]" :: "r"(uint32_t(v)), "r"(p) : "memory"); }
+static inline void gunyahMmioWrite32(uintptr_t p, uint32_t v) { __asm__ volatile("str %w0, [%1]" :: "r"(v), "r"(p) : "memory"); }
+
 // Bounded, read-only discovery of firmware-assigned modern virtio PCI BARs.
 // This does not size BARs, negotiate features, reset the device or enable DMA.
 namespace GunyahPci {

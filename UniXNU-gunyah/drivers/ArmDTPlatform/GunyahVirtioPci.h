@@ -27,12 +27,12 @@ class GunyahVirtioPci {
   uint64_t queuePhysical = 0, transferPhysical = 0, capacity = 0;
   unsigned completed = 0;
   static void barrier() { __asm__ volatile("dmb osh" ::: "memory"); }
-  static uint8_t r8(uintptr_t p) { return *reinterpret_cast<volatile uint8_t *>(p); }
-  static uint16_t r16(uintptr_t p) { return *reinterpret_cast<volatile uint16_t *>(p); }
-  static uint32_t r32(uintptr_t p) { return *reinterpret_cast<volatile uint32_t *>(p); }
-  static void w8(uintptr_t p, uint8_t v) { *reinterpret_cast<volatile uint8_t *>(p) = v; barrier(); }
-  static void w16(uintptr_t p, uint16_t v) { *reinterpret_cast<volatile uint16_t *>(p) = v; barrier(); }
-  static void w32(uintptr_t p, uint32_t v) { *reinterpret_cast<volatile uint32_t *>(p) = v; barrier(); }
+  static uint8_t r8(uintptr_t p) { return gunyahMmioRead8(p); }
+  static uint16_t r16(uintptr_t p) { return gunyahMmioRead16(p); }
+  static uint32_t r32(uintptr_t p) { return gunyahMmioRead32(p); }
+  static void w8(uintptr_t p, uint8_t v) { gunyahMmioWrite8(p, v); barrier(); }
+  static void w16(uintptr_t p, uint16_t v) { gunyahMmioWrite16(p, v); barrier(); }
+  static void w32(uintptr_t p, uint32_t v) { gunyahMmioWrite32(p, v); barrier(); }
   static void address(uintptr_t p, uint64_t v) { w32(p, uint32_t(v)); w32(p + 4, uint32_t(v >> 32)); }
   bool fail(const char *reason) { IOLog("GUNYAH-BLOCK: failure=%s\n", reason); return false; }
 

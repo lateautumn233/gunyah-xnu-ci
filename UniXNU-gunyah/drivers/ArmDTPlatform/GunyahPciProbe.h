@@ -61,12 +61,12 @@ static void gunyahPciProbe(IOService *provider)
   for (unsigned device = 0; device < 32; device++) {
     unsigned functions = 1;
     for (unsigned function = 0; function < functions; function++) {
-      auto *cfg = reinterpret_cast<volatile uint32_t *>(mapping->getVirtualAddress() + (device << 15) + (function << 12));
-      uint32_t id = cfg[0];
+      uintptr_t cfg = mapping->getVirtualAddress() + (device << 15) + (function << 12);
+      uint32_t id = gunyahMmioRead32(cfg);
       if ((id & 0xffff) == 0xffff || (id & 0xffff) == 0) continue;
       uint8_t config[256];
       for (unsigned word = 0; word < 64; word++) {
-        uint32_t value = cfg[word];
+        uint32_t value = gunyahMmioRead32(cfg + word * 4);
         memcpy(config + word * 4, &value, 4);
       }
       __asm__ volatile("dmb osh" ::: "memory");
