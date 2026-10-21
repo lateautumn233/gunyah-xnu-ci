@@ -35,9 +35,23 @@ jobs:
           ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
           ./unixnu fetch
           ./unixnu ipsw fetch
+      - name: Reference candidate (kernel without storage/display drivers)
+        working-directory: UniXNU
+        run: |
+          python3 "$GITHUB_WORKSPACE/patches/make-reference-device.py" ../UniXNU-droidvm ../UniXNU-droidvm-ref
+          ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm-ref --out "$PWD/out-ref"
+          ./unixnu fetch
+          mkdir -p out-ref && ln -sfn "$PWD/out/ipsw" out-ref/ipsw
+          ./unixnu build kernel -j "$(sysctl -n hw.ncpu)" --out "$PWD/out-ref"
+          ls -la out-ref/droidvm/kernel
       - name: Build
         working-directory: UniXNU
-        run: ./unixnu build ${{ inputs.step }} -j "$(sysctl -n hw.ncpu)"
+        run: |
+          ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
+          ./unixnu tree
+          mkdir -p out/droidvm/tree/build/reference-candidate
+          cp out-ref/droidvm/kernel/kernel.macho out-ref/droidvm/kernel/kernel.json out/droidvm/tree/build/reference-candidate/
+          ./unixnu build ${{ inputs.step }} -j "$(sysctl -n hw.ncpu)"
       - name: Collect
         if: always()
         run: |
