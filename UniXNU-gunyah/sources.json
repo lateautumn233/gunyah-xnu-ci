@@ -1,0 +1,34 @@
+{
+  "UniXNU": {
+    "url": "https://github.com/UniXNU/UniXNU.git",
+    "commit": "7b52e7968c76453cdc18b5aa174fc368d5293b91"
+  },
+  "xnu": {
+    "url": "https://github.com/apple-oss-distributions/xnu.git",
+    "commit": "1b191cb58250d0705d8a51287127505aa4bc0789"
+  },
+  "libplatform": {
+    "url": "https://github.com/apple-oss-distributions/libplatform.git",
+    "commit": "c7b97b198e8329813fd9ca7fe122a82c2cffc109"
+  },
+  "libdispatch": {
+    "url": "https://github.com/apple-oss-distributions/libdispatch.git",
+    "commit": "cdb61e93e803d0093635f356753a9a30c09836db"
+  },
+  "AvailabilityVersions": {
+    "url": "https://github.com/apple-oss-distributions/AvailabilityVersions.git",
+    "commit": "933f9360f1b70dfbda5548386a3d65e0358b4f7d"
+  },
+  "corecrypto-2023": {
+    "url": "https://github.com/ONLYA/corecrypto-2023.git",
+    "commit": "11fba65b12d8830630e248dfa8344caf8b065f26"
+  },
+  "libpthread": {
+    "url": "https://github.com/apple-oss-distributions/libpthread.git",
+    "commit": "a6c70ca0e544347a0377babf748f831577ec24f9"
+  },
+  "hfs": {
+    "url": "https://github.com/apple-oss-distributions/hfs.git",
+    "commit": "31d5ec238dfab485e78a9a30b8b92d13e8914f03"
+  }
+}

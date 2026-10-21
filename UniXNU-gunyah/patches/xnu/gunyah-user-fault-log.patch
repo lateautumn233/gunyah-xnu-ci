@@ -1,0 +1,60 @@
+diff --git a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
+index c40c6ea..e7eef99 100644
+--- a/osfmk/arm64/sleh.c
++++ b/osfmk/arm64/sleh.c
+@@ -1,3 +1,6 @@
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++#include <pexpert/pexpert.h>
++#endif
+ /*
+  * Copyright (c) 2012-2020 Apple Inc. All rights reserved.
+  *
+@@ -1210,6 +1213,14 @@ handle_pc_align(arm_saved_state_t *ss)
+ static void
+ handle_sp_align(arm_saved_state_t *ss)
+ {
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	unsigned diagnostic = 0;
++	PE_parse_boot_argn("gunyah-user-selftest", &diagnostic, sizeof(diagnostic));
++	if (diagnostic == 1) {
++		printf("GUNYAH-USER-ALIGN: pc=0x%llx sp=0x%llx\n",
++		    get_saved_state_pc(ss), get_saved_state_sp(ss));
++	}
++#endif
+ 	exception_type_t exc;
+ 	mach_exception_data_type_t codes[2];
+ 	mach_msg_type_number_t numcodes = 2;
+@@ -1481,6 +1492,17 @@ handle_user_abort(arm_saved_state_t *state, uint32_t esr, vm_offset_t fault_addr
+ 		exc |= EXC_PTRAUTH_BIT;
+ 	}
+ #endif /* __has_feature(ptrauth_calls) */
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	{
++		unsigned diagnostic = 0;
++		PE_parse_boot_argn("gunyah-user-selftest", &diagnostic, sizeof(diagnostic));
++		if (diagnostic == 1) {
++			printf("GUNYAH-USER-FAULT: pc=0x%llx sp=0x%llx esr=0x%x far=0x%llx code=%lld type=%u\n",
++			    get_saved_state_pc(state), get_saved_state_sp(state), esr,
++			    (uint64_t)fault_addr, codes[0], fault_type);
++		}
++	}
++#endif
+ 	exception_triage(exc, codes, numcodes);
+ 	__builtin_unreachable();
+ }
+@@ -1496,6 +1518,15 @@ handle_kernel_abort_recover(
+ 	thread->machine.recover_far = fault_addr;
+ #if defined(HAS_APPLE_PAC)
+ 	MANIPULATE_SIGNED_THREAD_STATE(state,
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	unsigned diagnostic = 0;
++	PE_parse_boot_argn("gunyah-user-selftest", &diagnostic, sizeof(diagnostic));
++	if (diagnostic == 1) {
++		printf("GUNYAH-USER-FAULT: pc=0x%llx sp=0x%llx esr=0x%x far=0x%llx code=%lld type=%u\n",
++		    get_saved_state_pc(state), get_saved_state_sp(state), esr,
++		    (uint64_t)fault_addr, codes[0], fault_type);
++	}
++#endif
+ 	    "mov	x1, %[pc]		\n"
+ 	    "str	x1, [x0, %[SS64_PC]]	\n",
+ 	    [pc] "r"(copyio_recovery_get_recover_addr(state))

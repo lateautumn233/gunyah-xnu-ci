@@ -1,0 +1,53 @@
+--- a/drivers/ArmCpu/ArmCpu.cpp
++++ b/drivers/ArmCpu/ArmCpu.cpp
+@@ -130,6 +130,31 @@
+   return value;
+ }
+ 
++// Opt-in single-CPU proof of real IRQ delivery and scheduler timed wakeups.
++// Keep logging in thread context; the interrupt path remains unchanged.
++static void gunyahTimerSelftest (void *, wait_result_t)
++{
++  uint64_t frequency;
++  __asm__ volatile ("mrs %0, cntfrq_el0" : "=r" (frequency));
++  bool passed = frequency != 0 && armcpu_registered != 0 && armcpu_gic_ready != 0;
++  IOLog ("GUNYAH-TIMER: start intid=%u frequency=%llu registered=%u gic=%u\n",
++         gTimerIntid, frequency, armcpu_registered, armcpu_gic_ready);
++  for (unsigned sample = 1; sample <= 3; sample++) {
++    uint64_t irqBefore = armcpu_timer_interrupts;
++    uint64_t before = counter ();
++    IOSleep (100);
++    uint64_t elapsed = counter () - before;
++    uint64_t irqAfter = armcpu_timer_interrupts;
++    // Allow 1 ms of deadline quantization; log raw values for host validation.
++    bool ok = irqAfter > irqBefore && elapsed >= frequency * 99 / 1000;
++    passed = passed && ok;
++    IOLog ("GUNYAH-TIMER: sample=%u irq_before=%llu irq_after=%llu ticks=%llu %s\n",
++           sample, irqBefore, irqAfter, elapsed, ok ? "PASS" : "FAIL");
++  }
++  IOLog ("GUNYAH-TIMER: result=%s\n", passed ? "PASS" : "FAIL");
++  thread_terminate (current_thread ());
++}
++
+ static bool waitClear (uintptr_t base, unsigned offset, uint32_t mask)
+ {
+   uint64_t frequency;
+@@ -438,6 +463,18 @@
+   registerService ();
+   __atomic_store_n (&gBootRegistered, 1U, __ATOMIC_RELEASE);
+   drainPending ();
++  unsigned timerSelftest = 0;
++  PE_parse_boot_argn ("gunyah-timer-selftest", &timerSelftest, sizeof (timerSelftest));
++  if (timerSelftest == 1) {
++    if (skipGic || ml_get_max_cpu_number () != 0) {
++      IOLog ("GUNYAH-TIMER: result=SKIP (requires one CPU with GIC enabled)\n");
++    } else {
++      thread_t thread;
++      kern_return_t result = kernel_thread_start (&gunyahTimerSelftest, nullptr, &thread);
++      if (result == KERN_SUCCESS) { thread_deallocate (thread); }
++      else { IOLog ("GUNYAH-TIMER: result=FAIL (thread creation %d)\n", result); }
++    }
++  }
+   return true;
+ }
+ 

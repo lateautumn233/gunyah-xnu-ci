@@ -1,0 +1,15 @@
+--- a/bsd/kern/ubc_subr.c
++++ b/bsd/kern/ubc_subr.c
+@@ -4348,6 +4348,12 @@ accelerate_entitlement_queries(
+ 	 */
+ 	assert(ret == KERN_NOT_SUPPORTED);
+ 
++#if XNU_GUNYAH
++	/* Bring-up without the original AMFI kext: nothing to accelerate. */
++	if (amfi == NULL) {
++		return 0;
++	}
++#endif
+ 	ret = amfi->OSEntitlements.adjustContextWithoutMonitor(
+ 		cs_blob->csb_entitlements,
+ 		cs_blob);

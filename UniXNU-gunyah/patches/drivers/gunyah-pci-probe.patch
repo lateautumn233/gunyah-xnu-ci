@@ -1,0 +1,18 @@
+--- a/drivers/ArmDTPlatform/ArmDTPlatform.cpp
++++ b/drivers/ArmDTPlatform/ArmDTPlatform.cpp
+@@ -21,6 +21,7 @@
+ #include <libkern/c++/OSData.h>
+ #include <libkern/c++/OSIterator.h>
+ #include <pexpert/pexpert.h>
++#include "GunyahPciProbe.h"
+ 
+ // Observation counters describe actual published nubs, not started drivers.
+ extern "C" {
+@@ -225,6 +226,7 @@
+   if (!createDeviceNubs (provider)) {
+     return false;
+   }
++  gunyahPciProbe (provider);
+   if (platformStage == 3) {
+     platformStageReset ();
+   }

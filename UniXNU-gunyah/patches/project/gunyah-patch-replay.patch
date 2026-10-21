@@ -1,0 +1,33 @@
+--- a/scripts/build-xnu-4k-baseline.sh
++++ b/scripts/build-xnu-4k-baseline.sh
+@@ -29,6 +29,17 @@
+     OBJROOT="$ROOT/build/availability" SYMROOT="$ROOT/build/availability" \
+     DSTROOT="$ROOT/.cache/fakeroot" CMAKE="$(command -v cmake)" NINJA="$(command -v ninja)"
+ fi
++# Device patches can overlap upstream patch context. Temporarily remove them
++# before checking/replaying upstream patches, then restore them in order.
++GUNYAH_PATCHES=()
++if [ -n "${GUNYAH_XNU_PATCHES:-}" ]; then
++  GUNYAH_PATCHES=("$GUNYAH_XNU_PATCHES"/*.patch)
++  for ((i=${#GUNYAH_PATCHES[@]}-1; i>=0; i--)); do
++    if git -C .cache/xnu-work apply --reverse --check "${GUNYAH_PATCHES[i]}" >/dev/null 2>&1; then
++      git -C .cache/xnu-work apply --reverse "${GUNYAH_PATCHES[i]}"
++    fi
++  done
++fi
+ # The optional observation hooks overlap existing root/exec patch context.
+ # Remove them first so earlier independent patches retain their idempotent checks.
+ # The same holds for the boot-time GPU addon mount (zzy), which edits the owner Data mount function inside the systemos patch.
+@@ -39,6 +50,12 @@
+   fi
+ done
+ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
++  if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
++    git -C .cache/xnu-work apply --check "$PATCH"
++    git -C .cache/xnu-work apply "$PATCH"
++  fi
++done
++for PATCH in "${GUNYAH_PATCHES[@]}"; do
+   if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
+     git -C .cache/xnu-work apply --check "$PATCH"
+     git -C .cache/xnu-work apply "$PATCH"

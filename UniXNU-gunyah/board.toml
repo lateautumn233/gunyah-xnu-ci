@@ -1,0 +1,18 @@
+[board]
+name = "gunyah"
+soc = "gunyah-virtual-arm64"
+description = "Single-vCPU Gunyah guest; resources come from the final guest FDT"
+kit = "gunyah"
+
+[kernel]
+defconfig = "gunyah_defconfig"
+
+[gunyah]
+page_size = 4096
+cpu_count = 1
+psci_method = "hvc"
+uart = "ns16550a"
+virtio_transport = "pci"
+restricted_dma_pool = false
+# Source kernel bring-up only: no IPSW/prelink/storage identity selected yet.
+stage = "source-kernel"

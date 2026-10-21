@@ -1,0 +1,39 @@
+--- a/iokit/Kernel/IOPlatformExpert.cpp
++++ b/iokit/Kernel/IOPlatformExpert.cpp
+@@ -51,6 +51,9 @@
+ #include <libkern/c++/OSContainers.h>
+ #include <libkern/c++/OSSharedPtr.h>
+ #include <libkern/crypto/sha1.h>
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++#include <libkern/crypto/crypto_internal.h>
++#endif
+ #include <libkern/OSAtomic.h>
+ 
+ #if defined(__arm64__)
+@@ -2204,6 +2207,16 @@
+ void
+ IOPlatformExpertDevice::generatePlatformUUID( void )
+ {
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	/* ConfigureIOKit precedes the source provider's EARLY_BOOT registration.
++	 * IOPlatformExpert::start retries publication after crypto initialization
++	 * and lockdown. Keep the real chip identity and SHA1 UUID calculation.
++	 */
++	if (!g_crypto_funcs) {
++		printf("GUNYAH-XNU: platform UUID deferred until crypto registration\n");
++		return;
++	}
++#endif
+ 	IORegistryEntry * entry;
+ 	OSString *        string = NULL;
+ 	uuid_string_t     uuid;
+@@ -2280,6 +2293,9 @@
+ 
+ 	if (string) {
+ 		setProperty( kIOPlatformUUIDKey, string );
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++		printf("GUNYAH-XNU: platform UUID %s\n", uuid);
++#endif
+ 		gIOPlatformUUIDAndSerialDone = true;
+ 
+ 		string->release();

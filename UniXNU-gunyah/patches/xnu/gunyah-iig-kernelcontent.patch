@@ -1,0 +1,15 @@
+--- a/iokit/IOKit/IORPC.h
++++ b/iokit/IOKit/IORPC.h
+@@ -224,7 +224,12 @@
+ 	IORPCMessageMach * message;
+ 	IORPCMessageMach * reply;
+ 	uint32_t           sendSize;
+ 	uint32_t           replySize;
++	/* Gunyah: the available iig (Xcode 16.4) emits kernel-side dispatch code that
++	 * names this field (added by xnu-10002). 8796's IOUserServer never sets or reads
++	 * it, so it stays zero; no DriverKit dext runs in this guest.
++	 */
++	IORPCMessage     * kernelContent;
+ };
+ typedef struct IORPC IORPC;
+ 

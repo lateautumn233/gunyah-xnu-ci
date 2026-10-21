@@ -1,0 +1,55 @@
+name: build-kernel
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: baseline or platform
+        default: platform
+jobs:
+  kernel:
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      UNIXNU_XNU_TAG: xnu-8796.141.3
+      UNIXNU_XNU_COMMIT: 1b191cb58250d0705d8a51287127505aa4bc0789
+      UNIXNU_XNU_DARWIN: 22.6.0
+      UNIXNU_XNU_VERSION: 8796.141.3
+      UNIXNU_DRIVERKIT_TAG: xnu-8796.141.3
+      UNIXNU_TRUSTCACHE_TAG: xnu-8796.141.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16.4
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+      - name: Tools
+        run: brew install cmake ninja unifdef dtc
+      - name: Fetch pinned sources
+        run: python3 UniXNU-gunyah/scripts/workspace.py fetch --sources "$RUNNER_TEMP/sources"
+      - name: Prepare tree
+        run: |
+          python3 UniXNU-gunyah/scripts/workspace.py prepare --sources "$RUNNER_TEMP/sources" --tree "$RUNNER_TEMP/tree"
+          # The upstream helper queries the rate-limited GitHub API for optional DriverKit/TrustCache headers; skip them.
+          mkdir -p "$RUNNER_TEMP/tree/.cache/sources"
+          for n in xnu-driverkit-8796.141.3 xnu-driverkit-crypto-8796.141.3 xnu-restored-headers xnu-trustcache-8796.141.3; do
+            echo '[]' > "$RUNNER_TEMP/tree/.cache/sources/$n.json"
+          done
+      - name: Preflight
+        run: python3 UniXNU-gunyah/scripts/build-macos.py --tree "$RUNNER_TEMP/tree" --preflight
+      - name: Build
+        run: python3 UniXNU-gunyah/scripts/build-macos.py --tree "$RUNNER_TEMP/tree" --stage "${{ inputs.stage }}" --jobs "$(sysctl -n hw.ncpu)"
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p out
+          cp -R "$RUNNER_TEMP/tree/build/gunyah-logs" out/logs || true
+          cp "$RUNNER_TEMP/tree/gunyah-preflight.json" out/ || true
+          cp "$RUNNER_TEMP/tree/build/gunyah-result/"* out/ || true
+          cp "$RUNNER_TEMP/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped" out/ || true
+          for f in out/logs/*.log; do tail -c 2000000 "$f" > "$f.tail" && mv "$f.tail" "$f"; done || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kernel-${{ inputs.stage }}
+          path: out

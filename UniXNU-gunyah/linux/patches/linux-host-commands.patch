@@ -1,0 +1,70 @@
+diff --git a/Makefile b/Makefile
+index e78d847..a87c17f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -143,8 +143,12 @@ installsrc:
+ 
+ else ifneq ($(findstring xnu_tests,$(RC_ProjectName)),)
+ 
++ifneq ($(GUNYAH_LINUX),1)
+ export SYSCTL_HW_PHYSICALCPU := $(shell /usr/sbin/sysctl -n hw.physicalcpu)
++endif
++ifneq ($(GUNYAH_LINUX),1)
+ export SYSCTL_HW_LOGICALCPU  := $(shell /usr/sbin/sysctl -n hw.logicalcpu)
++endif
+ MAKEJOBS := --jobs=$(shell expr $(SYSCTL_HW_LOGICALCPU) + 1)
+ 
+ default: install
+@@ -160,8 +164,12 @@ installsrc:
+ 
+ else ifeq ($(RC_ProjectName),xnu_tests_driverkit)
+ 
++ifneq ($(GUNYAH_LINUX),1)
+ export SYSCTL_HW_PHYSICALCPU := $(shell /usr/sbin/sysctl -n hw.physicalcpu)
++endif
++ifneq ($(GUNYAH_LINUX),1)
+ export SYSCTL_HW_LOGICALCPU  := $(shell /usr/sbin/sysctl -n hw.logicalcpu)
++endif
+ MAKEJOBS := --jobs=$(shell expr $(SYSCTL_HW_LOGICALCPU) + 1)
+ 
+ default: install
+@@ -193,8 +201,12 @@ endif
+ # CPUs. If the system does not support SMT, use N+1.
+ # If MAKEJOBS or -jN is passed on the make line, that takes precedence.
+ #
++ifneq ($(GUNYAH_LINUX),1)
+ export SYSCTL_HW_PHYSICALCPU := $(shell /usr/sbin/sysctl -n hw.physicalcpu)
++endif
++ifneq ($(GUNYAH_LINUX),1)
+ export SYSCTL_HW_LOGICALCPU  := $(shell /usr/sbin/sysctl -n hw.logicalcpu)
++endif
+ MAKEJOBS := --jobs=$(shell expr $(SYSCTL_HW_LOGICALCPU) + 1)
+ 
+ TOP_TARGETS = \
+diff --git a/libkern/libkern/Makefile b/libkern/libkern/Makefile
+index 16241f4..ceaef28 100644
+--- a/libkern/libkern/Makefile
++++ b/libkern/libkern/Makefile
+@@ -118,7 +118,7 @@ EXPORT_MI_DIR = libkern
+ 
+ version.h: version.h.template $(SRCROOT)/config/MasterVersion
+ 	@$(LOG_GENERATE) "libkern/$@$(Color0) from $(ColorF)$<"
+-	$(_v)install $(DATA_INSTALL_FLAGS) $< $@
++	$(_v)$(INSTALL) $(DATA_INSTALL_FLAGS) $< $@
+ 	$(_v)$(NEWVERS) $@ > /dev/null
+ 
+ include $(MakeInc_rule)
+diff --git a/makedefs/MakeInc.top b/makedefs/MakeInc.top
+index 0316792..488c83e 100644
+--- a/makedefs/MakeInc.top
++++ b/makedefs/MakeInc.top
+@@ -285,7 +285,9 @@ endif
+ # $(warning PRIMARY_KERNEL_CONFIGS is $(PRIMARY_KERNEL_CONFIGS))
+ # $(warning VARIANT_CONFIGS is $(VARIANT_CONFIGS))
+ 
++ifneq ($(GUNYAH_LINUX),1)
+ MEMORY_SIZE := $(shell /usr/sbin/sysctl -n hw.memsize)
++endif
+ 
+ # Assume LTO scaling by default, unless it is being explicitly passed on the command-line
+ LARGE_BUILD_FOOTPRINT := $(if $(BUILD_LTO),$(BUILD_LTO),1)

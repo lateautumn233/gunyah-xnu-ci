@@ -1,0 +1,86 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -925,6 +925,11 @@
+ 
+ 	bsd_init_kprintf("calling bsd_autoconf\n");
+ 	bsd_autoconf();
++#if defined(GUNYAH_BLOCK_BSD) && GUNYAH_BLOCK_BSD
++	/* devfs/device switches exist; wait for asynchronous transport discovery. */
++	extern void gunyah_block_publish(void);
++	gunyah_block_publish();
++#endif
+ 
+ #if CONFIG_DTRACE
+ 	dtrace_postinit();
+@@ -1056,7 +1061,14 @@
+ 	init_rootvnode = NULLVP;  /* use rootvnode after this point */
+ 
+ 
++#if defined(GUNYAH_BLOCK_BSD) && GUNYAH_BLOCK_BSD
++	/* The diagnostic gvblk0 root has no sealed-volume authentication; the
++	 * exemption is explicit (rd=gvblk0 plus gunyah-root-unauthenticated=1). */
++	extern bool gunyah_block_root_unauthenticated(void);
++	if (!bsd_rooted_ramdisk() && !gunyah_block_root_unauthenticated()) {
++#else
+ 	if (!bsd_rooted_ramdisk()) {
++#endif
+ 		boolean_t require_rootauth = FALSE;
+ 
+ #if XNU_TARGET_OS_OSX && defined(__arm64__)
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -36,6 +36,9 @@
+ #include <IOKit/IOUserClient.h>
+ #include <libkern/c++/OSAllocation.h>
+ 
++#if defined(GUNYAH_BLOCK_BSD) && GUNYAH_BLOCK_BSD
++extern "C" bool gunyah_block_root_device(const char *name, dev_t *device);
++#endif
+ extern "C" {
+ #include <libkern/amfi/amfi.h>
+ #include <sys/codesign.h>
+@@ -885,6 +888,22 @@
+ 		}
+ 	}
+ 
++#if defined(GUNYAH_BLOCK_BSD) && GUNYAH_BLOCK_BSD
++	/* rd=gvblk0: the published read-only virtio block node, resolved like a
++	 * memory device (no IOMedia, no BSD-name registry matching). */
++	{
++		dev_t gunyahRoot = NODEV;
++		if (gunyah_block_root_device(rdBootVar, &gunyahRoot)) {
++			OSSafeReleaseNULL(matching);
++			*root = gunyahRoot;
++			strlcpy(rootName, rdBootVar, rootNameSize);
++			IOLog("BSD root: %s, major %d, minor %d\n", rootName, major(*root), minor(*root));
++			*oflags = 0;
++			goto iofrootx;
++		}
++	}
++#endif
++
+ 	if ((!matching) && rdBootVar[0]) {
+ 		// by BSD name
+ 		look = rdBootVar;
+--- a/bsd/miscfs/mockfs/mockfs_vfsops.c
++++ b/bsd/miscfs/mockfs/mockfs_vfsops.c
+@@ -86,6 +86,19 @@
+ 	mockfs_mount_t mockfs_mount_data = NULL;
+ 	dk_memdev_info_t memdev_info;
+ 
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	/*
++	 * mockfs accepts any block device and sits ahead of loadable filesystems
++	 * in the mountroot order. Keep it from claiming a disk root; EINVAL is
++	 * the silent "not mine" answer in vfs_mountroot().
++	 */
++	extern bool bsd_rooted_ramdisk(void);
++	if (!bsd_rooted_ramdisk()) {
++		printf("mockfs_mountroot: root device is not a RAM disk; declining\n");
++		return EINVAL;
++	}
++#endif
++
+ 	/*
+ 	 * TODO: Validate that the device at least LOOKS like a mach-o (has a sane header); this would prevent us
+ 	 *   from causing EBADMACHO panics further along the boot path.

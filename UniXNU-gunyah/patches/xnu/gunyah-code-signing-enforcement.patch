@@ -1,0 +1,50 @@
+--- a/bsd/kern/kern_cs.c
++++ b/bsd/kern/kern_cs.c
+@@ -91,7 +91,8 @@
+ unsigned int cs_debug_unsigned_exec_failures = 0;
+ unsigned int cs_debug_unsigned_mmap_failures = 0;
+ 
+-#if CONFIG_ENFORCE_SIGNED_CODE
++/* Gunyah diagnostics must reject signature errors even without an AMFI provider. */
++#if CONFIG_ENFORCE_SIGNED_CODE || (defined(XNU_GUNYAH) && XNU_GUNYAH)
+ #define DEFAULT_CS_SYSTEM_ENFORCEMENT_ENABLE 1
+ #define DEFAULT_CS_PROCESS_ENFORCEMENT_ENABLE 1
+ #else
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -1430,6 +1430,15 @@
+ 	} else {
+ 		imgp->ip_csflags &= ~CS_VALID;
+ 	}
++
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	/* There is no AMFI exec policy in this source build to set these flags.
++	 * Carry global enforcement into the task pmap and reject tainted pages.
++	 */
++	if (cs_process_global_enforcement()) {
++		imgp->ip_csflags |= CS_HARD | CS_KILL | CS_ENFORCEMENT;
++	}
++#endif
+ 
+ 	if (proc_getcsflags(p) & CS_EXEC_SET_HARD) {
+ 		imgp->ip_csflags |= CS_HARD;
+--- a/osfmk/vm/vm_fault.c
++++ b/osfmk/vm/vm_fault.c
+@@ -2820,6 +2820,17 @@
+ 	if (map_is_switched) {
+ 		assert(pmap == vm_map_pmap(current_thread()->map));
+ 		assert(!(prot & VM_PROT_WRITE) || (map_is_switch_protected == FALSE));
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++		/* exec_prefault_data operates in the new task's switched map. Do not
++		 * install a tainted executable page before that task's own fault
++		 * handler can enforce CS_KILL. This is an optional prefault: report
++		 * failure without sending a signal to the unrelated current task.
++		 */
++		if ((prot & VM_PROT_EXECUTE) && pmap_get_vm_map_cs_enforced(pmap)) {
++			printf("GUNYAH-CS: refusing invalid executable page in switched map\n");
++			return KERN_CODESIGN_ERROR;
++		}
++#endif
+ 		reject_page = FALSE;
+ 	} else {
+ 		if (cs_debug > 5) {

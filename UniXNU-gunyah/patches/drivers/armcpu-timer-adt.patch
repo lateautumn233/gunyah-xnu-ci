@@ -1,0 +1,40 @@
+--- a/drivers/ArmCpu/ArmCpu.cpp
++++ b/drivers/ArmCpu/ArmCpu.cpp
+@@ -86,8 +86,9 @@
+ 
+ OSDefineMetaClassAndStructors (ArmCpu, IOCPU)
+ 
+-// Redistributor ISENABLER0: SGIs 0..15 (only SGI 0 is used by the kernel; the others let the self-SGI probe tell which INTIDs the GIC accepts) and PPI 27.
+-static const uint32_t kSgiPpiEnable = 0xffffU | (1U << 27);
++// Gunyah: virtual-timer INTID is supplied by the final guest FDT through ADT.
++static uint32_t gTimerIntid = 0;
++static uint32_t kSgiPpiEnable = 0;
+ 
+ static const uint32_t kIpiSpiBase = 1008;   // INTIDs 1008..1015 stand for 'IPI to logical core 0..7'
+ 
+@@ -214,6 +215,16 @@
+   if (valid) {
+     memcpy (bus, ranges->getBytesNoCopy (), sizeof (bus));
+     memcpy (regions, reg->getBytesNoCopy (), sizeof (regions));
++  }
++  OSData *timerProperty = OSDynamicCast (OSData, gic->getProperty ("virtual-timer-intid"));
++  uint32_t timerIntid = 0;
++  if (timerProperty != nullptr && timerProperty->getLength () == sizeof (timerIntid)) {
++    memcpy (&timerIntid, timerProperty->getBytesNoCopy (), sizeof (timerIntid));
++  }
++  valid = valid && timerIntid >= 16 && timerIntid < 32;
++  if (valid) {
++    gTimerIntid = timerIntid;
++    kSgiPpiEnable = 0xffffU | (1U << timerIntid);
+   }
+   OSData *strideProperty = OSDynamicCast (OSData, gic->getProperty ("redistributor-stride"));
+   if (strideProperty != nullptr && strideProperty->getLength () == sizeof (uint64_t)) {
+@@ -565,7 +576,7 @@
+     armcpu_irq_id=static_cast<uint32_t>(id & 0xffffff);
+     if ((id & 0xffffff) >= 1020) { armcpu_irq_phase=0;break; }
+     if(diagnosePower && ++drained>128)panic("ArmCpu: IRQ drain exceeds 128 id=%llx timer=%llu IPI=%llu",id,armcpu_timer_interrupts,armcpu_ipi_interrupts);
+-    if ((id & 0xffffff) == 27) {
++    if ((id & 0xffffff) == gTimerIntid) {
+       armcpu_timer_interrupts = armcpu_timer_interrupts + 1;
+       armcpu_core_timer[logicalId & 7] = armcpu_core_timer[logicalId & 7] + 1;
+       armcpu_irq_phase=2;

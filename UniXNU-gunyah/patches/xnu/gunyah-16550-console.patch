@@ -1,0 +1,99 @@
+diff --git a/pexpert/arm/gunyah_uart.h b/pexpert/arm/gunyah_uart.h
+new file mode 100644
+index 0000000..49159ae
+--- /dev/null
++++ b/pexpert/arm/gunyah_uart.h
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: BSD-2-Clause-Patent */
++/* Byte-spaced, byte-access ns16550a, with firmware baud rate preserved. */
++#ifndef GUNYAH_UART_H
++#define GUNYAH_UART_H
++static inline int gunyah_16550_valid_reg(uint64_t base, uint64_t size) {
++	return base != 0 && base < 0x100000000ULL && size == 8 && (base & 4095) <= 4088;
++}
++static inline void gunyah_16550_init(volatile uint8_t *p) {
++	p[3] &= (uint8_t)~0x80U; /* DLAB off before touching IER; preserve framing. */
++	p[1] = 0; /* Polling only. */
++}
++static inline unsigned int gunyah_16550_tx_ready(volatile uint8_t *p) { return p[5] & 0x20; }
++static inline void gunyah_16550_tx(volatile uint8_t *p, uint8_t c) { p[0] = c; }
++static inline unsigned int gunyah_16550_rx_ready(volatile uint8_t *p) { return p[5] & 1; }
++static inline uint8_t gunyah_16550_rx(volatile uint8_t *p) { return p[0]; }
++#endif
+diff --git a/pexpert/arm/pe_serial.c b/pexpert/arm/pe_serial.c
+index 997a4ab..1eccb29 100644
+--- a/pexpert/arm/pe_serial.c
++++ b/pexpert/arm/pe_serial.c
+@@ -165,9 +165,12 @@ get_serial_functions(serial_device_t device)
+ static void
+ serial_poll(void)
+ {
+-	#if __arm64__
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	/* No firmware WFE timeout is assumed after ExitBootServices. */
++	__asm__ volatile ("yield");
++#elif __arm64__
+ 	__builtin_arm_wfe();
+-	#endif
++#endif
+ }
+ 
+ /**
+@@ -738,6 +741,47 @@ serial_hibernation_cleanup(void)
+ }
+ #endif /* HIBERNATION */
+ 
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++#include "gunyah_uart.h"
++static volatile uint8_t *gunyah_uart;
++static void gunyah_uart_init(void) { gunyah_16550_init(gunyah_uart); __asm__ volatile("dsb sy" ::: "memory"); }
++static unsigned int gunyah_uart_tx_ready(void) { return gunyah_16550_tx_ready(gunyah_uart); }
++static void gunyah_uart_tx(uint8_t c) { gunyah_16550_tx(gunyah_uart, c); }
++static unsigned int gunyah_uart_rx_ready(void) { return gunyah_16550_rx_ready(gunyah_uart); }
++static uint8_t gunyah_uart_rx(void) { return gunyah_16550_rx(gunyah_uart); }
++SECURITY_READ_ONLY_LATE(static struct pe_serial_functions) gunyah_serial_functions = {
++	.init = gunyah_uart_init,
++	.transmit_ready = gunyah_uart_tx_ready,
++	.transmit_data = gunyah_uart_tx,
++	.receive_ready = gunyah_uart_rx_ready,
++	.receive_data = gunyah_uart_rx,
++	/* This build selects Gunyah exclusively; no PI3 device is registered. */
++	.device = SERIAL_PI3_UART,
++};
++static int gunyah_serial_init(void)
++{
++	DTEntry entry;
++	void const *data;
++	unsigned int size;
++	uint64_t reg[2];
++	if (SecureDTLookupEntry(NULL, "/gunyah-uart", &entry) != kSuccess ||
++	    SecureDTGetProperty(entry, "compatible", &data, &size) != kSuccess ||
++	    size != sizeof("ns16550a") || memcmp(data, "ns16550a", size) != 0 ||
++	    SecureDTGetProperty(entry, "reg", &data, &size) != kSuccess || size != sizeof(reg)) {
++		return 0;
++	}
++	memcpy(reg, data, sizeof(reg));
++	if (!gunyah_16550_valid_reg(reg[0], reg[1])) { return 0; }
++	gunyah_uart = (volatile uint8_t *)ml_io_map(reg[0], reg[1]);
++	if (gunyah_uart == NULL) { return 0; }
++	register_serial_functions(&gunyah_serial_functions);
++	gunyah_uart_init();
++	serial_do_transmit = 1;
++	uart_initted = true;
++	return 1;
++}
++#endif
++
+ int
+ serial_init(void)
+ {
+@@ -769,6 +813,9 @@ serial_init(void)
+ 		return 1;
+ 	}
+ 
++#if defined(XNU_GUNYAH) && XNU_GUNYAH
++	return gunyah_serial_init();
++#endif
+ 	soc_base = pe_arm_get_soc_base_phys();
+ 
+ 	if (soc_base == 0) {
