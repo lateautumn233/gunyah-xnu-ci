@@ -39,6 +39,9 @@ jobs:
         run: |
           # xnu-8796 passes a cc1 option that Xcode 16 removed (zero auto-var-init is now unconditional).
           sed -i '' '/enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang/d' "$RUNNER_TEMP/tree/.cache/xnu-work/makedefs/MakeInc.def"
+          # Xcode 16 rejects arrays of an over-aligned 1-byte element; a uint64_t element keeps the alignment (the stack buffer only grows).
+          sed -i '' 's/^typedef char __attribute__((aligned(_Alignof(union iovecs)))) uio_stackbuf_t;/typedef uint64_t uio_stackbuf_t;/' "$RUNNER_TEMP/tree/.cache/xnu-work/bsd/sys/uio_internal.h"
+          grep -n "uio_stackbuf_t;" "$RUNNER_TEMP/tree/.cache/xnu-work/bsd/sys/uio_internal.h"
       - name: Preflight
         run: python3 UniXNU-gunyah/scripts/build-macos.py --tree "$RUNNER_TEMP/tree" --preflight
       - name: Build
