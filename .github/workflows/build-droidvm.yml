@@ -1,0 +1,49 @@
+name: build-droidvm
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: macOS runner label
+        default: macos-26
+      unixnu_ref:
+        default: wip/droidvm
+      device_ref:
+        default: wip/hackintosh
+      step:
+        description: unixnu build step(s)
+        default: kernel
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 300
+    steps:
+      - name: Toolchain info
+        run: |
+          xcodebuild -version; xcrun --sdk iphoneos --show-sdk-path; sw_vers; df -h /
+      - name: Tools
+        run: brew install cmake ninja unifdef llvm mtools dtc
+      - name: Clone UniXNU (Droid-VM) and device repo
+        run: |
+          git clone --recurse-submodules --branch "${{ inputs.unixnu_ref }}" https://github.com/Droid-VM/UniXNU.git
+          git clone --branch "${{ inputs.device_ref }}" https://github.com/Droid-VM/UniXNU-droidvm.git
+      - name: Configure
+        working-directory: UniXNU
+        run: |
+          ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
+          ./unixnu fetch
+          ./unixnu ipsw fetch
+      - name: Build
+        working-directory: UniXNU
+        run: ./unixnu build ${{ inputs.step }} -j "$(sysctl -n hw.ncpu)"
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p collect
+          cp -R UniXNU/out/droidvm/logs collect/ 2>/dev/null || true
+          find UniXNU/out/droidvm -maxdepth 3 \( -name 'kernel.macho' -o -name '*.log' -o -name '*.json' \) -size -200M 2>/dev/null | head -200 | while read f; do mkdir -p "collect/$(dirname "$f")"; cp "$f" "collect/$f"; done
+          gzip -r collect/UniXNU/out 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: droidvm-${{ inputs.step }}
+          path: collect
