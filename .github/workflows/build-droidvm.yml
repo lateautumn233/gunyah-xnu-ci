@@ -24,7 +24,7 @@ jobs:
         run: |
           xcodebuild -version; xcrun --sdk iphoneos --show-sdk-path; sw_vers; df -h /
       - name: Tools
-        run: brew install cmake ninja unifdef llvm mtools dtc
+        run: brew install cmake ninja unifdef llvm mtools dtc openssl@3
       - name: Clone UniXNU (Droid-VM) and device repo
         run: |
           git clone --recurse-submodules --branch "${{ inputs.unixnu_ref }}" https://github.com/Droid-VM/UniXNU.git
@@ -56,6 +56,17 @@ jobs:
           ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
           ./unixnu tree
           bash "$GITHUB_WORKSPACE/patches/seed-github-cache.sh" out/droidvm/tree
+          # Owner root: signed policies of the original OS and SystemOS images (not automated by the public repos).
+          ./unixnu ipsw fetch OS Cryptex1,SystemOS
+          TV="$GITHUB_WORKSPACE/UniXNU-droidvm/.cache/firmware/target-volumes"
+          mkdir -p "$TV/os-mount"
+          for f in 044-76040-038.dmg 044-76034-038.dmg; do cp "$(ls out/ipsw/*/$f)" "$TV/$f"; done
+          df -h /
+          TREE="$PWD/out/droidvm/tree"
+          python3 "$TREE/kits/VerifiedRoot/tests/check.py" --output "$TREE/build/verified-root-host" --openssl-prefix "$(brew --prefix openssl@3)"
+          hdiutil attach -readonly -noverify -noautofsck -nobrowse -mountpoint "$TV/os-mount" "$TV/044-76040-038.dmg"
+          python3 "$TREE/scripts/build-owner-os-policy.py"
+          python3 "$TREE/scripts/build-owner-systemos-policy.py"
           mkdir -p out/droidvm/tree/build/reference-candidate
           cp out-ref/droidvm/kernel/kernel.macho out-ref/droidvm/kernel/kernel.json out/droidvm/tree/build/reference-candidate/
           ./unixnu build ${{ inputs.step }} -j "$(sysctl -n hw.ncpu)"
