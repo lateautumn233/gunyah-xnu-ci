@@ -35,6 +35,10 @@ jobs:
           for n in xnu-driverkit-8796.141.3 xnu-driverkit-crypto-8796.141.3 xnu-restored-headers xnu-trustcache-8796.141.3; do
             echo '[]' > "$RUNNER_TEMP/tree/.cache/sources/$n.json"
           done
+      - name: Adapt to Xcode 16.4 clang
+        run: |
+          # xnu-8796 passes a cc1 option that Xcode 16 removed (zero auto-var-init is now unconditional).
+          sed -i '' '/enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang/d' "$RUNNER_TEMP/tree/.cache/xnu-work/makedefs/MakeInc.def"
       - name: Preflight
         run: python3 UniXNU-gunyah/scripts/build-macos.py --tree "$RUNNER_TEMP/tree" --preflight
       - name: Build
