@@ -84,7 +84,7 @@ python3 "$TREE/scripts/build-original-system-trust.py"
 # 7. package (UniXNU.efi), DarwinBoot.efi, payload, boot disk
 ./unixnu build package -j "$J"
 EDK2=$(ls -d out/feeds/mu_basecore-* | head -1)
-bash "$DEV/scripts/build-darwinboot-efi.sh" "$TREE" "$EDK2" DEBUG
+CLANG_BIN="$(brew --prefix llvm)/bin/" bash "$DEV/scripts/build-darwinboot-efi.sh" "$TREE" "$EDK2" DEBUG
 ./unixnu build payload \
   --trust-cache "$TREE/build/original-static-system-trust/original-static-system.bundle" \
   --data-ramdisk "$TREE/build/droidvm-data/data-2g.dbr" --skip-setup --unique-chip-id 47554e5941480001
