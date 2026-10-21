@@ -51,23 +51,7 @@ def apply(path, patch):
         run("git", "-C", path, "apply", patch)
 
 
-def prepare(sources, tree):
-    for name in SOURCES:
-        verify(sources / name, name)
-    tree.mkdir(parents=True, exist_ok=True)
-    # Freeze the inputs. Refuse to merge into an existing build directory.
-    if any(tree.iterdir()):
-        raise ValueError(f"Build tree must be empty: {tree}")
-    run("git", "init", tree)  # Keep git apply rooted here even inside an outer checkout.
-    upstream = sources / "UniXNU"
-    for name in ("scripts", "drivers", "kits", "patches", "package"):
-        shutil.copytree(upstream / name, tree / name, ignore=shutil.ignore_patterns("__pycache__"))
-    # UniXNU's own xnu patches target 10063. Replace them with the curated set ported to the
-    # pinned XNU (scripts/port-upstream-patches.py); the prelink kit patches are 10063-only too.
-    shutil.rmtree(tree / "patches/xnu")
-    shutil.copytree(DEVICE / "patches/upstream", tree / "patches/xnu")
-    shutil.rmtree(tree / "kits/NativePrelink/patches")
-    (tree / "kits/NativePrelink/patches").mkdir()
+def retarget(tree):
     # Retarget the upstream driver script from iOS 17 (10063) to the iOS 16 line (8796).
     script = tree / "scripts/build-xnu-4k-baseline.sh"
     text = script.read_text()
@@ -99,6 +83,25 @@ def prepare(sources, tree):
             raise ValueError(f"Upstream kernel audit changed: {old_value}")
         text = text.replace(old_value, new_value)
     audit.write_text(text)
+
+
+def prepare(sources, tree):
+    for name in SOURCES:
+        verify(sources / name, name)
+    tree.mkdir(parents=True, exist_ok=True)
+    # Freeze the inputs. Refuse to merge into an existing build directory.
+    if any(tree.iterdir()):
+        raise ValueError(f"Build tree must be empty: {tree}")
+    run("git", "init", tree)  # Keep git apply rooted here even inside an outer checkout.
+    upstream = sources / "UniXNU"
+    for name in ("scripts", "drivers", "kits", "patches", "package"):
+        shutil.copytree(upstream / name, tree / name, ignore=shutil.ignore_patterns("__pycache__"))
+    # UniXNU's own xnu patches target 10063. Replace them with the curated set ported to the
+    # pinned XNU (scripts/port-upstream-patches.py); the prelink kit patches are 10063-only too.
+    shutil.rmtree(tree / "patches/xnu")
+    shutil.copytree(DEVICE / "patches/upstream", tree / "patches/xnu")
+    shutil.rmtree(tree / "kits/NativePrelink/patches")
+    (tree / "kits/NativePrelink/patches").mkdir()
     (tree / "refer").mkdir()
     for name in SOURCES:
         if name != "UniXNU":
@@ -115,6 +118,7 @@ def prepare(sources, tree):
     for patch in sorted((DEVICE / "patches/drivers").glob("*.patch")) + sorted((DEVICE / "patches/project").glob("*.patch")):
         run("git", "apply", "--check", patch, cwd=tree)
         run("git", "apply", patch, cwd=tree)
+    retarget(tree)  # after the project patches: they match the unmodified upstream script text
     shutil.copytree(DEVICE / "drivers", tree / "drivers", dirs_exist_ok=True)
     manifest = {"sources": SOURCES, "upstream_patch_count": len(patches), "device_patches": {
         str(p.relative_to(DEVICE)): hashlib.sha256(p.read_bytes()).hexdigest()
