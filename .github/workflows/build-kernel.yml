@@ -51,7 +51,8 @@ jobs:
           cp "$RUNNER_TEMP/tree/gunyah-preflight.json" out/ || true
           cp "$RUNNER_TEMP/tree/build/gunyah-result/"* out/ || true
           cp "$RUNNER_TEMP/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped" out/ || true
-          for f in out/logs/*.log; do tail -c 2000000 "$f" > "$f.tail" && mv "$f.tail" "$f"; done || true
+          grep -hn "error:\|Error [0-9]\|fatal" out/logs/*.log | grep -v "INSTALLHDR\|Werror\|error_" | head -40 || true
+          gzip out/logs/*.log || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
