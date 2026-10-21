@@ -1,0 +1,40 @@
+--- a/iokit/Kernel/IOUserClient.cpp
++++ b/iokit/Kernel/IOUserClient.cpp
+@@ -1499,7 +1499,7 @@
+ 	}
+ 
+ 	/* Validate input arguments */
+-	if (task == kernel_task || entitlement == NULL) {
++	if (task == kernel_task || entitlement == NULL || amfi == NULL) {
+ 		return NULL;
+ 	}
+ 	proc_t proc = (proc_t)get_bsdtask_info(task);
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -1506,7 +1506,7 @@
+ 	}
+ 
+ 	/* Validate input arguments */
+-	if (task == kernel_task || entitlement == NULL || value == NULL) {
++	if (task == kernel_task || entitlement == NULL || value == NULL || amfi == NULL) {
+ 		return false;
+ 	}
+ 	proc_t proc = (proc_t)get_bsdtask_info(task);
+@@ -1537,7 +1537,7 @@
+ 	}
+ 
+ 	/* Validate input arguments */
+-	if (task == kernel_task || entitlement == NULL) {
++	if (task == kernel_task || entitlement == NULL || amfi == NULL) {
+ 		return false;
+ 	}
+ 	proc_t proc = (proc_t)get_bsdtask_info(task);
+@@ -1570,7 +1570,7 @@
+ 	}
+ 
+ 	/* Validate input arguments */
+-	if (task == kernel_task || entitlement == NULL) {
++	if (task == kernel_task || entitlement == NULL || amfi == NULL) {
+ 		return NULL;
+ 	}
+ 	proc_t proc = (proc_t)get_bsdtask_info(task);
