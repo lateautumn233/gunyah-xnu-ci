@@ -48,6 +48,21 @@ jobs:
           cp -R UniXNU/out/droidvm/logs collect/ 2>/dev/null || true
           find UniXNU/out/droidvm -maxdepth 3 \( -name 'droidvm-disk.img' -o -name 'kernel.macho' -o -name '*.adt' -o -name '*.log' -o -name '*.json' \) -size -300M 2>/dev/null | head -200 | while read f; do mkdir -p "collect/$(dirname "$f")"; cp "$f" "collect/$f"; done
           gzip -r collect/UniXNU/out 2>/dev/null || true
+      - name: Inputs bundle for local (Linux) kernel builds
+        if: always()
+        run: |
+          T=UniXNU/out/droidvm/tree/build
+          mkdir -p bundle
+          tar czf bundle/droidvm-inputs.tgz -C "$GITHUB_WORKSPACE" \
+            UniXNU-droidvm/configs/droidvm_defconfig \
+            $(for d in reference-candidate verified-root-os verified-root-systemos verified-root-host droidvm-data droidvm-data-fixture/seed.json original-static-system-trust; do [ -e "$T/$d" ] && echo "UniXNU/out/droidvm/tree/build/$d"; done) 2>&1 | tail -3 || true
+          ls -la bundle
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: droidvm-inputs
+          path: bundle
+          compression-level: 0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
