@@ -1,0 +1,37 @@
+name: gpu-plugin
+on:
+  workflow_dispatch:
+jobs:
+  plugin:
+    runs-on: macos-26
+    timeout-minutes: 300
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          brew install cmake ninja unifdef llvm lld mtools dtc openssl@3 glslang shaderc spirv-tools vulkan-headers vulkan-loader bison flex pkgconf rustup
+          rustup-init -y --default-toolchain none || true
+      - name: Clone UniXNU (Droid-VM) and device repo
+        run: |
+          git clone --recurse-submodules --branch wip/droidvm https://github.com/Droid-VM/UniXNU.git
+          git clone --branch wip/hackintosh https://github.com/Droid-VM/UniXNU-droidvm.git
+      - name: Build the plugin
+        run: bash "$GITHUB_WORKSPACE/patches/gpu-plugin-build.sh"
+      - name: Collect
+        if: always()
+        run: |
+          T=UniXNU/out/droidvm/tree
+          mkdir -p collect
+          cp -R "$T/build/adreno-metal-plugin" collect/ 2>/dev/null || true
+          cp "$T"/.cache/mesa-tu-*.log collect/ 2>/dev/null || true
+          cp "$T"/build/turnip-smoke/*.json collect/ 2>/dev/null || true
+          tail -c 3000000 "$T"/.cache/mesa-tu-host-build.log > collect/mesa-tu-host-build.tail 2>/dev/null || true
+          tail -c 3000000 "$T"/.cache/mesa-tu-ios-build.log > collect/mesa-tu-ios-build.tail 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gpu-plugin
+          path: collect
+          retention-days: 7

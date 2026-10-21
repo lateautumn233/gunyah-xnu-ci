@@ -61,3 +61,4 @@ jobs:
         with:
           name: kernel-${{ inputs.stage }}
           path: out
+          retention-days: 1

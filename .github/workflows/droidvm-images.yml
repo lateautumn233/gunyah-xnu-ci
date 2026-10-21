@@ -31,4 +31,5 @@ jobs:
         with:
           name: droidvm-images
           path: out
+          retention-days: 1
           compression-level: 0

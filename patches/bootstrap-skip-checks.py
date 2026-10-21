@@ -3,6 +3,8 @@
 import re, sys
 p = sys.argv[1]
 s = open(p).read()
+if 'UNIXNU_KERNEL_BOOTSTRAP' in s.split('PY_')[-1][:400] or s.count("_o.environ.get('UNIXNU_KERNEL_BOOTSTRAP')"):
+    print('already guarded'); sys.exit(0)
 guard = "import os as _o, sys as _s\nif _o.environ.get('UNIXNU_KERNEL_BOOTSTRAP') == '1': _s.exit(0)\n"
 n = 0
 def sub(m):
