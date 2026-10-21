@@ -16,6 +16,8 @@ jobs:
   build:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 300
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain info
@@ -28,7 +30,9 @@ jobs:
           git clone --recurse-submodules --branch "${{ inputs.unixnu_ref }}" https://github.com/Droid-VM/UniXNU.git
           git clone --branch "${{ inputs.device_ref }}" https://github.com/Droid-VM/UniXNU-droidvm.git
       - name: Patch bootstrap pass
-        run: python3 "$GITHUB_WORKSPACE/patches/bootstrap-skip-checks.py" UniXNU/scripts/build-xnu-4k-baseline.sh
+        run: |
+          python3 "$GITHUB_WORKSPACE/patches/bootstrap-skip-checks.py" UniXNU/scripts/build-xnu-4k-baseline.sh
+          python3 "$GITHUB_WORKSPACE/patches/github-auth.py" UniXNU/scripts/prepare-xnu-source.py
       - name: Configure
         working-directory: UniXNU
         run: |
