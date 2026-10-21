@@ -24,7 +24,7 @@ jobs:
         run: |
           xcodebuild -version; xcrun --sdk iphoneos --show-sdk-path; sw_vers; df -h /
       - name: Tools
-        run: brew install cmake ninja unifdef llvm mtools dtc openssl@3
+        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3
       - name: Clone UniXNU (Droid-VM) and device repo
         run: |
           git clone --recurse-submodules --branch "${{ inputs.unixnu_ref }}" https://github.com/Droid-VM/UniXNU.git
