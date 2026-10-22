@@ -1,0 +1,144 @@
+name: build-droidvm-split
+# The same image as build-droidvm, built by parallel jobs: the reference kernel, the owner-root/Data seed and the GPU plugin do not depend on each
+# one another; the kernel/payload job waits for all three. The seed bundle and the GPU plugin are also what a local (Linux) kernel build consumes.
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: macOS runner label
+        default: macos-26
+      unixnu_ref:
+        default: wip/droidvm-upstream
+      device_ref:
+        default: wip/hackintosh-upstream
+      gpu:
+        description: build the Adreno Metal plugin and ship it as a payload addon (1/0)
+        default: '1'
+env:
+  GITHUB_TOKEN: ${{ github.token }}
+  HOMEBREW_NO_AUTO_UPDATE: '1'
+  HOMEBREW_NO_INSTALL_CLEANUP: '1'
+  HOMEBREW_NO_ENV_HINTS: '1'
+jobs:
+  ref:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone
+        id: clone
+        run: bash patches/clone.sh "${{ inputs.unixnu_ref }}" "${{ inputs.device_ref }}"
+      - name: Reference kernel cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: refout
+          key: ref-kernel-${{ steps.clone.outputs.unixnu_sha }}-${{ steps.clone.outputs.device_sha }}-${{ hashFiles('patches/make-reference-device.py', 'patches/job-ref.sh') }}
+      - name: Tools
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3
+      - name: Build the reference kernel
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash patches/job-ref.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ref-kernel
+          path: refout
+          retention-days: 1
+          compression-level: 0
+
+  seed:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3
+      - name: Clone
+        run: bash patches/clone.sh "${{ inputs.unixnu_ref }}" "${{ inputs.device_ref }}"
+      - name: Owner root, Data seed, trust caches
+        run: bash patches/job-seed.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seed-bundle
+          path: bundle
+          retention-days: 1
+          compression-level: 0
+
+  gpu:
+    if: inputs.gpu == '1'
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          brew install cmake ninja unifdef llvm lld mtools dtc openssl@3 glslang shaderc spirv-tools vulkan-headers vulkan-loader bison flex pkgconf rustup
+      - name: Clone
+        run: bash patches/clone.sh "${{ inputs.unixnu_ref }}" "${{ inputs.device_ref }}"
+      - name: Configure
+        run: bash patches/job-configure.sh
+      - name: Build caches (Mesa sources and build trees, metal2vulkan, cargo)
+        uses: actions/cache@v4
+        with:
+          path: |
+            UniXNU/out/droidvm/tree/.cache/mesa-work
+            UniXNU/out/droidvm/tree/.cache/gpu-reference
+            UniXNU/out/droidvm/tree/build/mesa-tu
+            UniXNU/out/droidvm/tree/build/mesa-tu-ios
+            UniXNU/out/droidvm/tree/build/m2v-target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: gpu-${{ runner.os }}-${{ hashFiles('UniXNU/scripts/data/adreno-compiler-inputs.json', 'UniXNU/scripts/data/gpu-metal-vulkan-inputs.json', 'UniXNU/scripts/build-turnip-darwin.py', 'UniXNU/scripts/build-native-metal-bridge.py', 'UniXNU/drivers/NativeAdreno/**', 'UniXNU/drivers/NativeMetal/bridge/**', 'patches/gpu-*.sh') }}
+          restore-keys: gpu-${{ runner.os }}-
+      - name: Build the plugin
+        run: bash patches/gpu-plugin-tree.sh UniXNU/out/droidvm/tree
+      - name: Collect
+        run: |
+          mkdir -p gpu-plugin
+          rsync -a --exclude '*.dSYM' --exclude 'AdrenoPM4.o' UniXNU/out/droidvm/tree/build/adreno-metal-plugin gpu-plugin/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpu-plugin
+          path: gpu-plugin
+          retention-days: 3
+
+  assemble:
+    needs: [ref, seed, gpu]
+    if: ${{ !cancelled() && needs.ref.result == 'success' && needs.seed.result == 'success' && (needs.gpu.result == 'success' || needs.gpu.result == 'skipped') }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3
+      - name: Clone
+        run: bash patches/clone.sh "${{ inputs.unixnu_ref }}" "${{ inputs.device_ref }}"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ref-kernel
+          path: in/ref
+      - uses: actions/download-artifact@v4
+        with:
+          name: seed-bundle
+          path: in/seed
+      - uses: actions/download-artifact@v4
+        if: needs.gpu.result == 'success'
+        with:
+          name: gpu-plugin
+          path: in/gpu
+      - name: Kernel, package, payload, boot disk
+        run: bash patches/job-assemble.sh in/seed/seed-bundle.tgz in/ref "$([ -d in/gpu/adreno-metal-plugin ] && echo in/gpu/adreno-metal-plugin)"
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p collect
+          cp -R UniXNU/out/droidvm/logs collect/ 2>/dev/null || true
+          find UniXNU/out/droidvm -maxdepth 3 \( -name 'droidvm-disk.img' -o -name 'kernel.macho' -o -name '*.adt' -o -name '*.log' -o -name '*.json' \) -size -300M 2>/dev/null | head -200 | while read f; do mkdir -p "collect/$(dirname "$f")"; cp "$f" "collect/$f"; done
+          gzip -r collect/UniXNU/out 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: droidvm-image
+          path: collect
+          retention-days: 1
