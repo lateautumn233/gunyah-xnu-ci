@@ -42,7 +42,13 @@ sys.path.insert(0, sys.argv[1] + '/drivers/DarwinBoot/Test')
 import packed_ramdisk
 print(packed_ramdisk.pack(Path(sys.argv[2]), Path(sys.argv[3])))
 PY
-python3 "$TREE/scripts/seed-data-grow.py" --gib 2 --volatile "$TREE/build/droidvm-data/data-32.dbr" "$TREE/build/droidvm-data/data-2g.dbr"
+# diskutil sometimes lists the attached seed's APFS container late (seen once with the IPSW download running): retry
+for attempt in 1 2 3 4; do
+  rm -f "$TREE/build/droidvm-data/data-2g.dbr"
+  python3 "$TREE/scripts/seed-data-grow.py" --gib 2 --volatile "$TREE/build/droidvm-data/data-32.dbr" "$TREE/build/droidvm-data/data-2g.dbr" && break
+  [ "$attempt" = 4 ] && exit 1
+  sleep 15
+done
 sed -i '' "s/^CONFIG_XNU_OWNER_DATA_VOLUME_UUID=.*/CONFIG_XNU_OWNER_DATA_VOLUME_UUID=\"$UUID\"/" "$DEV/configs/droidvm_defconfig"
 grep OWNER_DATA_VOLUME_UUID "$DEV/configs/droidvm_defconfig"
 
