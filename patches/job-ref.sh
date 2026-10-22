@@ -4,6 +4,8 @@ set -euxo pipefail
 W=$GITHUB_WORKSPACE
 cd "$W/UniXNU"
 J=$(sysctl -n hw.ncpu)
+# remember the main device repository first (fetch/ipsw use the main output directory)
+./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
 python3 "$W/patches/make-reference-device.py" ../UniXNU-droidvm ../UniXNU-droidvm-ref
 ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm-ref --out "$PWD/out-ref"
 ./unixnu fetch
