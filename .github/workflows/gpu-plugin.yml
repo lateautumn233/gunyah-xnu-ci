@@ -15,8 +15,8 @@ jobs:
           rustup-init -y --default-toolchain none || true
       - name: Clone UniXNU (Droid-VM) and device repo
         run: |
-          git clone --recurse-submodules --branch wip/droidvm https://github.com/Droid-VM/UniXNU.git
-          git clone --branch wip/hackintosh https://github.com/Droid-VM/UniXNU-droidvm.git
+          git clone --recurse-submodules --branch wip/droidvm-upstream https://github.com/lateautumn233/UniXNU.git
+          git clone --branch wip/hackintosh-upstream https://github.com/lateautumn233/UniXNU-droidvm.git
       - name: Build the plugin
         run: bash "$GITHUB_WORKSPACE/patches/gpu-plugin-build.sh"
       - name: Collect

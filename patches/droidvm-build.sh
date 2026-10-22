@@ -47,14 +47,16 @@ import packed_ramdisk
 print(packed_ramdisk.pack(Path(sys.argv[2]), Path(sys.argv[3])))
 PY
 python3 "$TREE/scripts/seed-data-grow.py" --gib 2 --volatile "$TREE/build/droidvm-data/data-32.dbr" "$TREE/build/droidvm-data/data-2g.dbr"
-# 4b. Adreno Metal plugin (Turnip + metal2vulkan bridge), staged into the seed without --publish: widgets/wallpaper render through it only after
-# the owner has seen it work; GPU=0 skips the whole step.
-DATA_RAMDISK="$TREE/build/droidvm-data/data-2g.dbr"
+# 4b. Adreno Metal plugin (Turnip + metal2vulkan bridge) and the default wallpaper's PNG overlay, packed into a GPU addon that the payload
+# carries next to the kernel: the Data seed stays untouched, so its persistent store survives a plugin rebuild. No --publish yet: widgets and
+# wallpaper render through the plugin only after the owner has seen it work. GPU=0 skips the whole step.
+ADDON_ARGS=()
 if [ "${GPU:-1}" = 1 ]; then
   bash "$W/patches/gpu-plugin-tree.sh" "$TREE"
-  python3 "$TREE/scripts/add-gpu-plugin-data.py" --clients WidgetRenderer_Default,PosterBoard,iconservicesagent \
-    "$TREE/build/droidvm-data/data-2g.dbr" "$TREE/build/droidvm-data/data-2g-gpu.dbr"
-  DATA_RAMDISK="$TREE/build/droidvm-data/data-2g-gpu.dbr"
+  python3 "$TREE/scripts/make-wallpaper-overlay.py" "$TV/os-mount" "$TREE/build/wallpaper-overlay"
+  python3 "$TREE/scripts/make-gpu-addon.py" --clients WidgetRenderer_Default,PosterBoard,iconservicesagent \
+    --wallpaper "$TREE/build/wallpaper-overlay" "$TREE/build/droidvm-data/gpu.addon"
+  ADDON_ARGS=(--gpu-addon "$TREE/build/droidvm-data/gpu.addon")
 fi
 sed -i '' "s/^CONFIG_XNU_OWNER_DATA_VOLUME_UUID=.*/CONFIG_XNU_OWNER_DATA_VOLUME_UUID=\"$UUID\"/" "$DEV/configs/droidvm_defconfig"
 grep OWNER_DATA_VOLUME_UUID "$DEV/configs/droidvm_defconfig"
@@ -102,6 +104,6 @@ EDK2=$(ls -d out/feeds/mu_basecore-* | head -1)
 CLANG_BIN="$(brew --prefix llvm)/bin/" bash "$DEV/scripts/build-darwinboot-efi.sh" "$TREE" "$EDK2" DEBUG
 ./unixnu build payload \
   "${TRUST_ARGS[@]}" \
-  --data-ramdisk "$DATA_RAMDISK" --skip-setup --unique-chip-id 47554e5941480001
+  --data-ramdisk "$TREE/build/droidvm-data/data-2g.dbr" "${ADDON_ARGS[@]}" --skip-setup --unique-chip-id 47554e5941480001
 bash "$DEV/scripts/make-droidvm-disk.sh" out/droidvm/payload/payload.img out/droidvm/package/Build/Out/AARCH64-DEBUG out/droidvm/droidvm-disk.img
 ls -la out/droidvm out/droidvm/payload
