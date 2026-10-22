@@ -36,6 +36,7 @@ sys.path.insert(0, sys.argv[1] + '/drivers/DarwinBoot/Test')
 import packed_ramdisk
 print(packed_ramdisk.pack(Path(sys.argv[2]), Path(sys.argv[3])))
 PY
+python3 "$W/patches/seed-grow-poll.py" "$TREE/scripts/seed-data-grow.py"
 # diskutil sometimes lists the attached seed's APFS container late (seen once with the IPSW download running): retry
 for attempt in 1 2 3 4; do
   rm -f "$TREE/build/droidvm-data/data-2g.dbr"
