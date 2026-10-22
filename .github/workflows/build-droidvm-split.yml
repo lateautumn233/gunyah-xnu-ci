@@ -145,9 +145,10 @@ jobs:
         with:
           path: |
             UniXNU/out/droidvm/tree/.cache/xnu-work
+            UniXNU/out/droidvm/tree/.cache/fakeroot
             UniXNU/out/droidvm/tree/build/xnu
-          key: xnu-${{ hashFiles('UniXNU/patches/xnu/**', 'UniXNU-droidvm/patches/**', 'UniXNU/scripts/build-xnu-4k-baseline.sh', 'UniXNU-droidvm/configs/droidvm_defconfig', 'UniXNU/feeds.toml', 'UniXNU-droidvm/feeds.toml') }}
-          restore-keys: xnu-
+          key: xnu2-${{ hashFiles('UniXNU/patches/xnu/**', 'UniXNU-droidvm/patches/**', 'UniXNU/scripts/build-xnu-4k-baseline.sh', 'UniXNU-droidvm/configs/droidvm_defconfig', 'UniXNU/feeds.toml', 'UniXNU-droidvm/feeds.toml') }}
+          restore-keys: xnu2-
       - name: Kernel, package, payload, boot disk
         run: bash patches/job-assemble-build.sh "$([ -d in/gpu/adreno-metal-plugin ] && echo in/gpu/adreno-metal-plugin)"
       - name: Collect
