@@ -52,11 +52,21 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
-      - name: Tools
-        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3
       - name: Clone
         run: bash patches/clone.sh "${{ inputs.unixnu_ref }}" "${{ inputs.device_ref }}"
+      # The seed (owner root policies, Data seed, trust caches, wallpaper overlay) only depends on these inputs. Reusing it keeps the Data
+      # volume's UUID and content, so the guest's persistent Data store survives a rebuild of everything else.
+      - name: Seed cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: bundle
+          key: seed-${{ hashFiles('UniXNU/scripts/prepare-owner-data-fixture.py', 'UniXNU/scripts/seed-data-grow.py', 'UniXNU/scripts/seed-data-skip-setup.py', 'UniXNU/scripts/build-owner-os-policy.py', 'UniXNU/scripts/build-owner-systemos-policy.py', 'UniXNU/scripts/build-original-system-trust.py', 'UniXNU/scripts/make-wallpaper-overlay.py', 'UniXNU/kits/VerifiedRoot/**', 'UniXNU/drivers/DarwinBoot/Test/packed_ramdisk.py', 'UniXNU-droidvm/board.toml', 'UniXNU-droidvm/scripts/build-owner-systemos-policy.py', 'UniXNU-droidvm/scripts/seed-data-disable-jobs.py', 'patches/job-seed.sh', 'patches/seed-grow-poll.py') }}
+      - name: Tools
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3
       - name: Owner root, Data seed, trust caches
+        if: steps.cache.outputs.cache-hit != 'true'
         run: bash patches/job-seed.sh
       - uses: actions/upload-artifact@v4
         with:
@@ -127,8 +137,19 @@ jobs:
         with:
           name: gpu-plugin
           path: in/gpu
+      - name: Configure and unpack the inputs
+        run: bash patches/job-assemble-prepare.sh in/seed/seed-bundle.tgz in/ref
+      # XNU compiles twice (a bootstrap pass for the compile records, then the real one): keep its objects and checkout between runs.
+      - name: Kernel build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            UniXNU/out/droidvm/tree/.cache/xnu-work
+            UniXNU/out/droidvm/tree/build/xnu
+          key: xnu-${{ hashFiles('UniXNU/patches/xnu/**', 'UniXNU-droidvm/patches/**', 'UniXNU/scripts/build-xnu-4k-baseline.sh', 'UniXNU-droidvm/configs/droidvm_defconfig', 'UniXNU/feeds.toml', 'UniXNU-droidvm/feeds.toml') }}
+          restore-keys: xnu-
       - name: Kernel, package, payload, boot disk
-        run: bash patches/job-assemble.sh in/seed/seed-bundle.tgz in/ref "$([ -d in/gpu/adreno-metal-plugin ] && echo in/gpu/adreno-metal-plugin)"
+        run: bash patches/job-assemble-build.sh "$([ -d in/gpu/adreno-metal-plugin ] && echo in/gpu/adreno-metal-plugin)"
       - name: Collect
         if: always()
         run: |
