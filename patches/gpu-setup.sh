@@ -30,7 +30,7 @@ if [ ! -x .cache/mesa-venv/bin/meson ]; then
   python3 -m venv .cache/mesa-venv
   .cache/mesa-venv/bin/pip install --quiet meson mako pyyaml packaging ply
 fi
-for tool in bison flex; do ln -sf "$(brew --prefix "$tool")/bin/$tool" ".cache/mesa-tools/bin/$tool"; done
+for tool in bison flex; do ln -sf "$(command -v brew >/dev/null && brew --prefix "$tool" || echo /usr)/bin/$tool" ".cache/mesa-tools/bin/$tool"; done
 .cache/mesa-tools/bin/bison --version | head -1
 
 if [ ! -d .cache/gpu-reference/metal2vulkan/.git ]; then
