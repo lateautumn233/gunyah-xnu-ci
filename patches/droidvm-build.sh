@@ -47,6 +47,15 @@ import packed_ramdisk
 print(packed_ramdisk.pack(Path(sys.argv[2]), Path(sys.argv[3])))
 PY
 python3 "$TREE/scripts/seed-data-grow.py" --gib 2 --volatile "$TREE/build/droidvm-data/data-32.dbr" "$TREE/build/droidvm-data/data-2g.dbr"
+# 4b. Adreno Metal plugin (Turnip + metal2vulkan bridge), staged into the seed without --publish: widgets/wallpaper render through it only after
+# the owner has seen it work; GPU=0 skips the whole step.
+DATA_RAMDISK="$TREE/build/droidvm-data/data-2g.dbr"
+if [ "${GPU:-1}" = 1 ]; then
+  bash "$W/patches/gpu-plugin-tree.sh" "$TREE"
+  python3 "$TREE/scripts/add-gpu-plugin-data.py" --clients WidgetRenderer_Default,PosterBoard,iconservicesagent \
+    "$TREE/build/droidvm-data/data-2g.dbr" "$TREE/build/droidvm-data/data-2g-gpu.dbr"
+  DATA_RAMDISK="$TREE/build/droidvm-data/data-2g-gpu.dbr"
+fi
 sed -i '' "s/^CONFIG_XNU_OWNER_DATA_VOLUME_UUID=.*/CONFIG_XNU_OWNER_DATA_VOLUME_UUID=\"$UUID\"/" "$DEV/configs/droidvm_defconfig"
 grep OWNER_DATA_VOLUME_UUID "$DEV/configs/droidvm_defconfig"
 ./unixnu defconfig droidvm_defconfig -D ../UniXNU-droidvm
@@ -81,12 +90,18 @@ print('static trust cache', hashlib.sha256(fields[3][1]).hexdigest())
 PY
 python3 "$TREE/scripts/build-original-system-trust.py"
 
+TRUST_ARGS=(--trust-cache "$TREE/build/original-static-system-trust/original-static-system.bundle")
+if [ "${GPU:-1}" = 1 ]; then
+  python3 "$TREE/scripts/make-owner-trust-bundle.py"
+  TRUST_ARGS=(--owner-trust-cache "$TREE/build/adreno-metal-plugin/owner-trust.bundle")
+fi
+
 # 7. package (UniXNU.efi), DarwinBoot.efi, payload, boot disk
 ./unixnu build package -j "$J"
 EDK2=$(ls -d out/feeds/mu_basecore-* | head -1)
 CLANG_BIN="$(brew --prefix llvm)/bin/" bash "$DEV/scripts/build-darwinboot-efi.sh" "$TREE" "$EDK2" DEBUG
 ./unixnu build payload \
-  --trust-cache "$TREE/build/original-static-system-trust/original-static-system.bundle" \
-  --data-ramdisk "$TREE/build/droidvm-data/data-2g.dbr" --skip-setup --unique-chip-id 47554e5941480001
+  "${TRUST_ARGS[@]}" \
+  --data-ramdisk "$DATA_RAMDISK" --skip-setup --unique-chip-id 47554e5941480001
 bash "$DEV/scripts/make-droidvm-disk.sh" out/droidvm/payload/payload.img out/droidvm/package/Build/Out/AARCH64-DEBUG out/droidvm/droidvm-disk.img
 ls -la out/droidvm out/droidvm/payload

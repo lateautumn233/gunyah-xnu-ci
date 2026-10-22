@@ -9,6 +9,9 @@ on:
         default: wip/droidvm
       device_ref:
         default: wip/hackintosh
+      gpu:
+        description: build the Adreno Metal plugin and stage it (1/0)
+        default: '1'
       step:
         description: unixnu build step(s)
         default: kernel
@@ -18,13 +21,14 @@ jobs:
     timeout-minutes: 300
     env:
       GITHUB_TOKEN: ${{ github.token }}
+      GPU: ${{ inputs.gpu }}
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain info
         run: |
           xcodebuild -version; xcrun --sdk iphoneos --show-sdk-path; sw_vers; df -h /
       - name: Tools
-        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3
+        run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3 glslang shaderc spirv-tools vulkan-headers vulkan-loader bison flex pkgconf rustup
       - name: Clone UniXNU (Droid-VM) and device repo
         run: |
           git clone --recurse-submodules --branch "${{ inputs.unixnu_ref }}" https://github.com/Droid-VM/UniXNU.git
