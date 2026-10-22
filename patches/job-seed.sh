@@ -50,8 +50,6 @@ mkdir -p "$TREE/refer"
 curl -fL --retry 5 -o "$TREE/refer/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw" "$IPSW_URL" &
 IPSW_PID=$!
 
-sed -i '' "s/^CONFIG_XNU_OWNER_DATA_VOLUME_UUID=.*/CONFIG_XNU_OWNER_DATA_VOLUME_UUID=\"$UUID\"/" "$DEV/configs/droidvm_defconfig"
-grep OWNER_DATA_VOLUME_UUID "$DEV/configs/droidvm_defconfig"
 
 # original static+system trust caches
 wait "$IPSW_PID"
@@ -82,6 +80,6 @@ python3 "$TREE/scripts/build-original-system-trust.py"
 T=UniXNU/out/droidvm/tree/build
 cd "$W"
 mkdir -p bundle
-tar czf bundle/seed-bundle.tgz UniXNU-droidvm/configs/droidvm_defconfig \
+tar czf bundle/seed-bundle.tgz \
   $(for d in verified-root-os verified-root-systemos verified-root-host droidvm-data droidvm-data-fixture/seed.json original-static-system-trust wallpaper-overlay; do echo "$T/$d"; done)
 ls -la bundle
