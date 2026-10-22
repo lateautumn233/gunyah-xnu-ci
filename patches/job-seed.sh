@@ -38,10 +38,10 @@ print(packed_ramdisk.pack(Path(sys.argv[2]), Path(sys.argv[3])))
 PY
 python3 "$W/patches/seed-grow-poll.py" "$TREE/scripts/seed-data-grow.py"
 # diskutil sometimes lists the attached seed's APFS container late (seen once with the IPSW download running): retry
-for attempt in 1 2 3 4; do
+for attempt in 1 2; do
   rm -f "$TREE/build/droidvm-data/data-2g.dbr"
   python3 "$TREE/scripts/seed-data-grow.py" --gib 2 --volatile "$TREE/build/droidvm-data/data-32.dbr" "$TREE/build/droidvm-data/data-2g.dbr" && break
-  [ "$attempt" = 4 ] && exit 1
+  [ "$attempt" = 2 ] && exit 1
   sleep 15
 done
 # the whole IPSW (static+system trust caches) downloads while the remaining steps run (started after the seed grow: it attaches a disk image and wants a quiet system)

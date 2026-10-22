@@ -11,12 +11,16 @@ old = """            listing = plistlib.loads(subprocess.check_output(['diskutil
                     container = entry['ContainerReference']
 """
 new = """            import time
+            print('hdiutil attached:', attached, 'store:', store)
+            ids = set(re.findall(r'/dev/(disk\d+)', attached)) | {store}
             container = None
             for _ in range(60):
                 listing = plistlib.loads(subprocess.check_output(['diskutil', 'apfs', 'list', '-plist']))
                 for entry in listing['Containers']:
-                    if any(s['DeviceIdentifier'] == store for s in entry.get('PhysicalStores', [])):
+                    stores = [x['DeviceIdentifier'] for x in entry.get('PhysicalStores', [])]
+                    if ids & set(stores) or entry['ContainerReference'] in ids:
                         container = entry['ContainerReference']
+                        store = re.sub(r's\d+$', '', stores[0]) if stores else store    # the whole-disk node that hdiutil detaches
                 if container:
                     break
                 time.sleep(1)
