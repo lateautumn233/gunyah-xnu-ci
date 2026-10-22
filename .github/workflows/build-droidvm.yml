@@ -6,9 +6,9 @@ on:
         description: macOS runner label
         default: macos-26
       unixnu_ref:
-        default: wip/droidvm
+        default: wip/droidvm-upstream
       device_ref:
-        default: wip/hackintosh
+        default: wip/hackintosh-upstream
       gpu:
         description: build the Adreno Metal plugin and stage it (1/0)
         default: '1'
@@ -31,11 +31,10 @@ jobs:
         run: brew install cmake ninja unifdef llvm lld mtools dtc openssl@3 glslang shaderc spirv-tools vulkan-headers vulkan-loader bison flex pkgconf rustup
       - name: Clone UniXNU (Droid-VM) and device repo
         run: |
-          git clone --recurse-submodules --branch "${{ inputs.unixnu_ref }}" https://github.com/Droid-VM/UniXNU.git
-          git clone --branch "${{ inputs.device_ref }}" https://github.com/Droid-VM/UniXNU-droidvm.git
-      - name: Patch bootstrap pass
+          git clone --recurse-submodules --branch "${{ inputs.unixnu_ref }}" https://github.com/lateautumn233/UniXNU.git
+          git clone --branch "${{ inputs.device_ref }}" https://github.com/lateautumn233/UniXNU-droidvm.git
+      - name: Authenticate the GitHub API fetches
         run: |
-          python3 "$GITHUB_WORKSPACE/patches/bootstrap-skip-checks.py" UniXNU/scripts/build-xnu-4k-baseline.sh
           python3 "$GITHUB_WORKSPACE/patches/github-auth.py" UniXNU/scripts/prepare-xnu-source.py
       - name: Configure
         working-directory: UniXNU
