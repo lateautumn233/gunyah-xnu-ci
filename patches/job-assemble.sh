@@ -6,7 +6,7 @@ set -euxo pipefail
 W=$GITHUB_WORKSPACE
 SEED=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 REF=$(cd "$2" && pwd)
-GPU_DIR=${3:-}
+GPU_DIR=${3:+$(cd "$3" && pwd)}   # absolute: the script changes directory
 cd "$W/UniXNU"
 J=$(sysctl -n hw.ncpu)
 DEV="$W/UniXNU-droidvm"
