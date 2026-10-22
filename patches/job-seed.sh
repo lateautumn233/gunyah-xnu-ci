@@ -14,12 +14,6 @@ TV="$DEV/.cache/firmware/target-volumes"
 TREE="$PWD/out/droidvm/tree"
 bash "$W/patches/seed-github-cache.sh" "$TREE"
 
-# the whole IPSW (static+system trust caches) downloads while the rest builds
-IPSW_URL=$(python3 -c "import tomllib;print(tomllib.load(open('$DEV/board.toml','rb'))['ipsw']['url'])")
-mkdir -p "$TREE/refer"
-curl -fL --retry 5 -o "$TREE/refer/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw" "$IPSW_URL" &
-IPSW_PID=$!
-
 # owner root
 ./unixnu ipsw fetch OS Cryptex1,SystemOS
 mkdir -p "$TV/os-mount"
@@ -49,6 +43,12 @@ for attempt in 1 2 3 4; do
   [ "$attempt" = 4 ] && exit 1
   sleep 15
 done
+# the whole IPSW (static+system trust caches) downloads while the remaining steps run (started after the seed grow: it attaches a disk image and wants a quiet system)
+IPSW_URL=$(python3 -c "import tomllib;print(tomllib.load(open('$DEV/board.toml','rb'))['ipsw']['url'])")
+mkdir -p "$TREE/refer"
+curl -fL --retry 5 -o "$TREE/refer/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw" "$IPSW_URL" &
+IPSW_PID=$!
+
 sed -i '' "s/^CONFIG_XNU_OWNER_DATA_VOLUME_UUID=.*/CONFIG_XNU_OWNER_DATA_VOLUME_UUID=\"$UUID\"/" "$DEV/configs/droidvm_defconfig"
 grep OWNER_DATA_VOLUME_UUID "$DEV/configs/droidvm_defconfig"
 
