@@ -9,7 +9,7 @@ cd "$W/UniXNU"
 TREE=$PWD/out/droidvm/tree
 bash "$W/patches/gpu-setup.sh" "$TREE"
 cd "$TREE"
-export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$(brew --prefix rustup)/bin:$HOME/.cargo/bin:$PATH"
 rustup toolchain install 1.98.0 --profile minimal -t aarch64-apple-ios -t aarch64-apple-darwin
 python3 scripts/build-turnip-darwin.py --target host
 python3 scripts/check-turnip-darwin-host.py || true      # builds plugin_smoke + the host IOKit shim the replay recorder needs
